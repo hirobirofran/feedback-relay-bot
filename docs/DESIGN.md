@@ -73,7 +73,7 @@ flowchart TB
   end
 
   subgraph Vercel[Vercel / Next.js 16]
-    WH[/api/webhook/line<br/>署名検証]
+    WH["/api/webhook/line<br/>署名検証"]
     CONV[Conversation Engine<br/>状態遷移・壁打ち]
     GH_CLIENT[GitHub Publisher<br/>Octokit]
   end
