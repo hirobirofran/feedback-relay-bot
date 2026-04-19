@@ -54,6 +54,7 @@
 | `docs/TASKS.md` | タスク一覧・進捗・次にやること |
 | `docs/KNOWLEDGE.md` | 気づき・ハマりポイント・家族レビューフィードバック・申し送り |
 | `docs/SETUP.md` | 環境構築手順（LINE・Upstash・Gemini・GitHub PAT・Vercel） |
+| `docs/WORKFLOW.md` | コミット粒度・メッセージ規約・ブランチ/PR 運用ルール（いつ commit・いつ branch を切るか） |
 
 ## 会話設計の初手ルール（Phase 1 着手時に守る）
 
