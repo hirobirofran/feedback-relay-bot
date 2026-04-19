@@ -26,7 +26,7 @@
 - **Phase 0 完了**（2026-04-19）: Next.js 16 スキャフォールド、docs 骨組み、外部サービス全設定済み、Vercel 初回デプロイ成功
   - 本番 URL: <https://feedback-relay-bot.vercel.app/>
   - LINE / Upstash / Gemini / GitHub PAT / Vercel env いずれも投入済み
-- Phase 1 未着手。Webhook 実装 → Gemini 整形 → GitHub 起票 の最小往復が次のゴール（[docs/DESIGN.md §10](./docs/DESIGN.md) の Phase 1 DoD 参照）
+- **Phase 1 進行中**（2026-04-19 着手）: LINE Webhook スケルトン（署名検証 + ホワイトリスト）まで実装済み、本番デプロイ・LINE Console 接続は未。Gemini 整形 → GitHub 起票の最小往復が Phase 1 残タスク（[docs/DESIGN.md §10](./docs/DESIGN.md) の Phase 1 DoD 参照）
 - 次にやること → `docs/TASKS.md` を参照
 
 ## 重要ルール
