@@ -57,6 +57,19 @@ Phase 0 完了。次は Phase 1 実装（[DESIGN.md §10](./DESIGN.md) の Phase
 - **二段返信（即時 ACK → Issue 完了通知）**: 家族レビュー（本人セルフ）から「Bot 応答までの無音が不安」の指摘あり（[KNOWLEDGE.md 2026-04-19 LINE チャンネル二重化セッション](./KNOWLEDGE.md) 参照）。B 案の `gathering` 状態 = 即時 ACK の自然な拡張なので、Step 2〜4 完了後に合流設計する
 - **ラベル運用**: sandbox / 本丸どちらも `from-family` ラベル整備、Gemini 出力の labels を採用する経路追加
 
+## 📌 後日着手（GitHub Issue 追跡）
+
+Phase 1 MVP 公開後、以下 2 件を順に着手する。**優先度は両方とも高い**が、#3 は #2 の上に段階的に重ねる Epic なので #2 から片付ける。
+
+- [ ] **[#2 イシュー起票フローの再検討](https://github.com/hirobirofran/feedback-relay-bot/issues/2)** — **優先度: 高**
+  - BOT が Public リポに直接起票する現状は PII リスクが拭えず、かつ要件整形されていないドラフトが開発側に流れ込む課題。
+  - 方針（2026-04-20 決定）: Private リポにドラフト起票 → Claude Code セッションで整形・仕分け → Public リポに正式起票 + ドラフト Close + リンク紐付け。
+  - Phase 1 サブタスク: Private ドラフトリポ作成 / BOT 起票先切替 / ドラフトラベル体系 / 承認フロー明文化 / 正式起票フォーマット定義。
+- [ ] **[#3 Epic: 要望対応フローの自動化（Human-in-Loop）](https://github.com/hirobirofran/feedback-relay-bot/issues/3)** — **優先度: 高だが #2 の後（後回し）**
+  - #2 で増える手動承認・手動起票の負担を、Human-in-Loop を保ったまま段階的自動化で減らす Epic。
+  - 次の一歩: 認証方式の裏取り（Max OAuth の課金挙動検証 / spend limit 設定）。Anthropic API 課金経路か Max 内で済むかで後続設計が変わる。
+  - **#2 と関連はするが依存はしない**（INVEST 原則）。#2 完了を待たず #3 の「認証裏取り」単体着手も可。
+
 ## Phase 2: 家族展開（未着手）
 
 ## Phase 3: 複数プロジェクト対応（未着手）
