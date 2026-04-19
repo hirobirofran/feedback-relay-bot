@@ -10,6 +10,85 @@
 
 ## 3. Upstash Redis の設定
 
+LINE ユーザーごとの会話状態（`state`・`messages`・`draft`）を保持するストレージ。24 時間 TTL で自動消滅。Vercel のサーバーレス関数から HTTP REST で叩くので、通常の Redis SDK ではなく `@upstash/redis` を使う。
+
+> **Claude Code への指示:** このセクションの手順をユーザーと進めるとき、Database 作成自体は Upstash Web UI 専用。`.env.local` / Vercel env の更新と、疎通確認までは伴走する。
+
+### Upstash 方針サマリ
+
+- **Type**: Regional（Global は家族規模では過剰。価格も上がる）
+- **Region**: `ap-northeast-1` (Tokyo) — 日本在住家族利用、Vercel のエッジと低レイテンシ
+- **Eviction**: `allkeys-lru`（デフォルト。24h TTL 使うので事実上効かないが保険として）
+- **TLS**: 有効（デフォルト）
+- **料金**: Free tier（月 10,000 コマンド、256MB）— 家族規模で余裕
+
+### 3.1 Database 作成手順
+
+1. <https://console.upstash.com/> にアクセス（GitHub login が最速）
+2. **Redis** タブ → **Create Database**
+3. 以下を設定:
+
+    | 項目 | 値 |
+    | --- | --- |
+    | Name | `feedback-relay-bot` |
+    | Type | **Regional** |
+    | Primary Region | **AP-NORTHEAST-1 (Tokyo)** |
+    | Eviction | ✅ Enabled (`allkeys-lru`) |
+    | TLS | ✅ Enabled (デフォルト) |
+
+4. **Create** をクリック
+5. Database 詳細画面で **Details** タブを選び、下にスクロールして **Connect** セクションを開く
+6. **Connect** 内の **REST** タブが選択されていることを確認（隣に TCP タブあり）
+7. 👁 アイコンで Token を表示、📋 アイコンで 2 行まとめてコピー。コピーした内容をそのまま `.env.local` に貼り付ける（形式は下記、`"..."` のダブルクォート込みで OK）:
+
+    ```env
+    UPSTASH_REDIS_REST_URL="https://xxxxx.upstash.io"
+    UPSTASH_REDIS_REST_TOKEN="..."
+    ```
+
+   > **UI 変更に注意**: 以前は独立した「REST API」タブがあったが現在は Details → Connect → REST に統合されている（2026-04-19 時点）。将来さらに UI が変わる可能性あり。その場合はブラウザで画面を開いた状態で AI（Claude in Chrome など）にガイドしてもらうのが早い。
+
+8. `.env.local` が ignore されていることを確認:
+
+    ```bash
+    git check-ignore .env.local
+    # → .env.local が返れば OK
+    ```
+
+### 3.2 疎通確認
+
+SDK 未導入のうちは REST API を curl で直接叩いて確認する:
+
+```bash
+# トークンを一度シェルに読み込む (履歴に残さない)
+export UPSTASH_URL_TMP=$(grep '^UPSTASH_REDIS_REST_URL=' .env.local | cut -d'=' -f2-)
+export UPSTASH_TOKEN_TMP=$(grep '^UPSTASH_REDIS_REST_TOKEN=' .env.local | cut -d'=' -f2-)
+
+# SET + GET の往復テスト (TTL 60 秒で即消える)
+curl -s -H "Authorization: Bearer $UPSTASH_TOKEN_TMP" \
+  "$UPSTASH_URL_TMP/set/conv:test/hello?EX=60"
+curl -s -H "Authorization: Bearer $UPSTASH_TOKEN_TMP" \
+  "$UPSTASH_URL_TMP/get/conv:test"
+
+unset UPSTASH_URL_TMP UPSTASH_TOKEN_TMP
+```
+
+期待: 1 行目が `{"result":"OK"}`、2 行目が `{"result":"hello"}`。認証失敗は 401、URL 誤りは 404。
+
+Phase 1 実装後は `@upstash/redis` SDK 経由で使う。`import { Redis } from '@upstash/redis'; const redis = Redis.fromEnv();` で env から自動読み込みされる。
+
+### 3.3 更新手順（Token 再発行時）
+
+Token は Upstash 側で **Roll Token** することで再発行できる（旧 Token は即無効）。漏れた時や定期ローテーション時に使う。
+
+1. <https://console.upstash.com/> の `feedback-relay-bot` database → **REST API** タブ
+2. **Roll Token** をクリック → 新 Token が発行される
+3. `.env.local` の `UPSTASH_REDIS_REST_TOKEN` を新値で**書き換える**
+4. Vercel ダッシュボード → プロジェクト → Settings → Environment Variables → `UPSTASH_REDIS_REST_TOKEN` を**書き換える**（UI から直接入力）
+5. Vercel で再デプロイ、疎通確認
+
+期限切れの概念は Upstash にはないので、定期更新は不要。漏洩時のみ実行。
+
 ## 4. Gemini API の設定
 
 食材管理アプリと**別プロジェクト・別キー**にする。無料枠 (RPD/TPM) はプロジェクト単位で共有されるため、同プロジェクトだと両アプリで食い合う。
@@ -53,7 +132,7 @@ feedback-relay-bot が食材管理アプリ [food-inventory-app](https://github.
 
 > **Claude Code への指示:** このセクションの手順をユーザーと進めるとき、PAT の発行自体は GitHub Web UI 専用で API 化できない。`.env.local` / Vercel env の更新と、完了後の疎通確認までは伴走する。
 
-### 方針サマリ
+### PAT 方針サマリ
 
 - **種類**: Fine-grained personal access token (classic PAT は使わない)
 - **対象リポジトリ**: `hirobirofran/food-inventory-app` のみ

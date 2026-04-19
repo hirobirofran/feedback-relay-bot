@@ -4,6 +4,23 @@
 
 ---
 
+## 2026-04-19
+
+### 技術的な気づき
+
+- 外部サービスの Web UI は手順書を書いた時点から容易に陳腐化する（今回 Upstash の「REST API」タブは Details → Connect → REST に統合済みだった）。手順書は**目的の値が取れればよい**くらいの粒度にとどめ、最新 UI の細部はブラウザ + AI（Claude in Chrome 等）に実時間でガイドさせるのが速い。変更を見つけたら手順書に「UI 変更あり（いつ時点）」の注記を残して次回に引き継ぐ
+- Upstash Redis の接続文字列は `"https://..."` と `"..."` のダブルクォート込みで出力される。`.env.local` にそのまま貼って `@upstash/redis` SDK・dotenv いずれもクォートは解釈してくれるので剥がさなくて良い。curl で検証するときだけ `tr -d '"'` で剥がす必要あり（[SETUP.md §3.2](./SETUP.md#32-疎通確認) の疎通スニペット参照）
+- GitHub Fine-grained PAT の期限は最大 1 年。期限切れで Bot が無言死するのを避けるため、発行と同時に Google カレンダー 1 週間前通知を仕込む運用に決定（[SETUP.md §5.4](./SETUP.md#54-期限リマインドの仕込み)）。Claude の Google Calendar MCP 経由で仕込めるので、更新手順にカレンダー再仕込みのステップまで含める
+- Gemini API の無料枠 (RPD/TPM) はプロジェクト単位で共有されるため、食材管理アプリと別プロジェクトで発行する必要がある。`Create API key in new project` を選ぶだけで新 `gen-lang-client-*` が自動作成される
+
+### 次回セッションへの申し送り
+
+- Phase 0 残: LINE 公式アカウント登録（重い）、Vercel プロジェクト作成（env が揃ってから）
+- Phase 1 着手時に `@upstash/redis`, `@google/generative-ai`, `@octokit/rest`, `@line/bot-sdk` の 4 パッケージを `npm install` する
+- 家族レビュー前の自己チェックは 3 往復の壁打ちで違和感を洗う（[CLAUDE.md の会話設計初手ルール](../CLAUDE.md#会話設計の初手ルールphase-1-着手時に守る)）
+
+---
+
 <!-- 新しいセッションの記録はこのテンプレートをコピーして追記してください
 ## YYYY-MM-DD
 
