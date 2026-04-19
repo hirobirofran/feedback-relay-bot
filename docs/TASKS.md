@@ -34,14 +34,16 @@ Phase 0 完了。次は Phase 1 実装（[DESIGN.md §10](./DESIGN.md) の Phase
 - [x] Vercel 本番デプロイ + LINE Webhook URL 設定 + Verify 成功（2026-04-19、本番 `https://feedback-relay-bot.vercel.app/api/line/webhook`）
 - [x] 初回 userId 回収 + `ALLOWED_LINE_USER_IDS` 投入 + 再デプロイ（2026-04-19、実機メッセージで `received authorized event` ログ確認済み。手順は [SETUP.md §6.5.3](./SETUP.md#653-初回-userid-の回収と投入ここが-phase-1-特有)）
 - [x] **A 案（単発版）実装 + sandbox リポへの E2E 疎通**（2026-04-19、`feedback-relay-bot-sandbox` private リポ作成、PAT access 追加、Vercel env に `GITHUB_REPO=feedback-relay-bot-sandbox` + `FEEDBACK_BOT_MODE=test` 投入、LINE 実機メッセージで sandbox #1 起票成功、タイトルに `[TEST]` プレフィックス付与確認、Gemini の `## 背景 / ## 期待する動作 / ## 補足 / ## 元メッセージ` セクション構造通り）
+- [x] **Bot 返信 3 文言の家族目線リライト**（2026-04-19、[src/app/api/line/webhook/route.ts](../src/app/api/line/webhook/route.ts) の成功/失敗/非テキスト 3 リプライを「受領感謝 → 何が起きたか → 次の期待行動」の 3 要素で揃え直し。`npm run build` 通過、実機疎通確認は別途）
+- [x] **家族公開前切替手順の書き下し**（2026-04-19、[docs/SETUP.md §8](./SETUP.md) に Production 切替・Redeploy・実機疎通・ロールバックを書き下し。Preview/Development は sandbox 恒久維持してデグレ検知に使う方針を明記。実切替は家族公開タイミングで別途実施）
 
 ### 🔲 次にやること（Phase 2 着手前）
 
-Phase 1 DoD 最短コース到達。以下は Phase 2 移行前の選択肢:
+Phase 1 DoD 最短コース到達 + 家族公開前の軽い整備まで完了。以下は Phase 2 移行前の残選択肢:
 
 - **B: Redis 会話状態 + 状態機械**（`gathering`→`confirming`→`done`、起票前に「これで起票しますか？」の確認ステップ）
-- **家族公開前チェックリスト運用**: Production env だけ `GITHUB_REPO=food-inventory-app` + `FEEDBACK_BOT_MODE=production` に切替、Preview は sandbox のまま残してデグレ検知用に維持（手順は [SETUP.md](./SETUP.md) §8 予定）
 - **ラベル運用**: sandbox / 本丸どちらも `from-family` ラベル整備、Gemini 出力の labels を採用する経路追加
+- **LINE follow event の初回あいさつ実装**（CLAUDE.md §会話設計の初手ルール 1 の未着手分。B 案の会話状態機械と合わせて再検討）
 
 ## Phase 2: 家族展開（未着手）
 

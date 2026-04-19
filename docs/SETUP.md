@@ -475,3 +475,75 @@ curl -s https://feedback-relay-bot.vercel.app/api/line/webhook
 #### 6.5.4 `.env.local` への反映
 
 ローカル dev で同じ userId で試せるように、`.env.local` の `ALLOWED_LINE_USER_IDS=` にも同じ値を入れておく。`.env.local.example` には**値を貼らない**（プレースホルダのまま）。
+
+## 7. （欠番・予約）
+
+Phase 2（Redis 会話状態機械 / 会話設計の見直し）の手順枠として欠番扱い。実装着手時にここを埋める。
+
+## 8. 家族公開前の Production 切替
+
+Phase 1 A 案完了直後は Production / Preview / Development 全環境が **sandbox リポ (`feedback-relay-bot-sandbox`) + `[TEST]` タイトル付与** で動いている。家族に LINE 公式アカウントの友達追加 URL を渡す前に、Production スコープだけを本丸リポに切り替える。
+
+> **Claude Code への指示:** このセクションは「家族公開」という判断が発生する瞬間にオーナー（ひろゆきさん）と一緒に実行する前提で書かれている。切替後は本丸リポ `hirobirofran/food-inventory-app` に実 Issue が立つので、誤実行のリスクが最も高い。必ず §8.5 の実機疎通まで終えてから家族に URL を渡す。
+
+### 8.1 方針
+
+- **Production のみ本丸切替**。Preview と Development は `feedback-relay-bot-sandbox` + `FEEDBACK_BOT_MODE=test` のまま**恒久維持**する
+- **理由**: Preview 経路を常時 sandbox に向けておくと、main にマージ前の PR プレビュー or ブランチデプロイで動作確認したときに本丸リポを汚さない。これが**家族公開後の唯一のデグレ検知手段**（テストスイート未整備のため）
+- sandbox 側は今後も残し、家族以外（本人の動作確認用途）でも活用する
+
+### 8.2 Vercel env 切替（UI 手順）
+
+1. [Vercel Dashboard](https://vercel.com/) → feedback-relay-bot プロジェクト → **Settings** → **Environment Variables**
+2. `GITHUB_REPO` 行の `⋯` → **Edit**
+    - Value: `food-inventory-app`
+    - Environments: **Production のみにチェック**（Preview / Development のチェックは外す）
+    - **Save**
+3. Preview / Development 用の `GITHUB_REPO=feedback-relay-bot-sandbox` は**別エントリとして残す**（同じ Key を環境別に複数保持できる）。未登録なら **Add New** で追加:
+    - Key: `GITHUB_REPO`
+    - Value: `feedback-relay-bot-sandbox`
+    - Environments: Preview / Development
+4. `FEEDBACK_BOT_MODE` も同様に:
+    - Production: `production`
+    - Preview / Development: `test`
+5. **`ALLOWED_LINE_USER_IDS` は全環境共通**（§6.5.3 で投入済み）のままで良い。家族分を追加する場合はここで**カンマ区切りで追記**（例: `U<本人>,U<家族1>,U<家族2>`）
+
+**秘密値は触らない**: `LINE_CHANNEL_SECRET` / `LINE_CHANNEL_ACCESS_TOKEN` / `GITHUB_TOKEN` / `GEMINI_API_KEY` / Upstash 資格情報は本セクションで変更する必要がない。
+
+### 8.3 Vercel MCP 補足（Claude 伴走時）
+
+Claude Code が伴走している場合、以下の MCP ツールで確認・支援ができる:
+
+- `mcp__vercel__vercel-get-environments` — 現在の env エントリを列挙。**値は暗号化されているため見えない**が、どの Key がどの Environment で設定されているかは確認できる
+- `mcp__vercel__vercel-create-environment-variables` — 新規追加
+- `mcp__vercel__vercel-remove-environment-variable` — 削除
+
+**初回の Production 切替は UI 手順を推奨**。誤操作時に「いま何が Production に入っているか」を Dashboard の一覧で目視できる方が安全。以降のメンテ（家族追加など値の追記だけ）は MCP 経由でも差し支えない。
+
+### 8.4 Redeploy（必須）
+
+env を保存しただけでは動いているデプロイには反映されない（既知、[KNOWLEDGE.md 2026-04-19 Phase 1 着手セッション](./KNOWLEDGE.md) 記載）。
+
+1. Vercel Dashboard → **Deployments** タブ → 最新の **Production** デプロイの `⋯` → **Redeploy**
+2. **Use existing Build Cache** は ON のままで OK
+3. Status が **Ready** になるまで待つ（通常 1-2 分）
+
+### 8.5 実機疎通確認（家族に URL を渡す前に必ず実施）
+
+1. LINE アプリから Bot に短いテキストを 1 通送信（例: `テスト送信です`）
+2. [feedback-relay-bot-sandbox リポ](https://github.com/hirobirofran/feedback-relay-bot-sandbox) には **Issue が立たないこと** を確認（Production 切替後なので本丸に飛ぶはず）
+3. [food-inventory-app リポ](https://github.com/hirobirofran/food-inventory-app) の Issues に **新規 Issue が立っていること** を確認
+4. タイトル冒頭に **`[TEST]` が付いていないこと** を確認（`FEEDBACK_BOT_MODE=production` が効いている証拠）
+5. LINE 側で受け取った返信文が `受け取りました、ありがとうございます。...` で始まることを確認
+6. 動作確認で立った Issue は **即 close**（本丸リポを汚染しないため）。削除は慎重に（削除権限がある場合でも履歴が残らないので close 推奨）
+
+### 8.6 ロールバック
+
+家族公開後に不具合が見つかり sandbox に戻したい場合:
+
+1. §8.2 の手順で Production スコープの `GITHUB_REPO` を `feedback-relay-bot-sandbox`、`FEEDBACK_BOT_MODE` を `test` に戻す
+2. §8.4 の Redeploy を実施
+3. 本丸リポに誤起票された Issue があれば close
+4. LINE 公式アカウントを **一時停止** したい場合: LINE Developers Console → Messaging API → **Webhook** トグルを OFF（Webhook URL は残して OK）
+
+元に戻すときは逆手順。Preview/Development を一切触っていないので、Production だけの往復で済む。
