@@ -3,8 +3,16 @@ import {
   getAllowedLineUserIds,
   getLineChannelSecret,
 } from "@/lib/env";
+import { buildIssueFromFeedback } from "@/lib/gemini";
+import { createIssue } from "@/lib/github";
+import { replyText } from "@/lib/line";
 
 export const runtime = "nodejs";
+
+const NON_TEXT_REPLY =
+  "すみません、今はテキストメッセージのみ対応しています。";
+const ERROR_REPLY =
+  "ごめんなさい、ちょっと調子が悪いみたいです。少し時間を空けてもう一度送ってみてください。";
 
 export async function GET(): Promise<Response> {
   return Response.json({ ok: true, path: "/api/line/webhook" });
@@ -41,10 +49,61 @@ export async function POST(request: Request): Promise<Response> {
       );
       continue;
     }
-    console.log(
-      `[line-webhook] received authorized event type=${event.type} userId=${userId}`,
-    );
+
+    try {
+      await handleAuthorizedEvent(event);
+    } catch (error) {
+      console.error("[line-webhook] handler failed", error);
+      if (event.type === "message" && event.replyToken) {
+        await safeReply(event.replyToken, ERROR_REPLY);
+      }
+    }
   }
 
   return Response.json({ ok: true });
+}
+
+async function handleAuthorizedEvent(event: webhook.Event): Promise<void> {
+  if (event.type !== "message" || !event.replyToken) {
+    console.log(`[line-webhook] skip non-message event type=${event.type}`);
+    return;
+  }
+
+  const { message, replyToken } = event;
+
+  if (message.type !== "text") {
+    console.log(
+      `[line-webhook] unsupported message type=${message.type}`,
+    );
+    await safeReply(replyToken, NON_TEXT_REPLY);
+    return;
+  }
+
+  const text = message.text?.trim() ?? "";
+  if (!text) {
+    await safeReply(replyToken, NON_TEXT_REPLY);
+    return;
+  }
+
+  console.log(`[line-webhook] drafting issue chars=${text.length}`);
+  const draft = await buildIssueFromFeedback(text);
+  console.log(`[line-webhook] issue draft title="${draft.title}"`);
+
+  const issue = await createIssue(draft);
+  console.log(
+    `[line-webhook] issue created number=${issue.number} url=${issue.url}`,
+  );
+
+  await safeReply(
+    replyToken,
+    `起票しました。\n${draft.title}\n${issue.url}`,
+  );
+}
+
+async function safeReply(replyToken: string, text: string): Promise<void> {
+  try {
+    await replyText(replyToken, text);
+  } catch (error) {
+    console.error("[line-webhook] reply failed", error);
+  }
 }
