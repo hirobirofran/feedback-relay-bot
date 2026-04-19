@@ -4,6 +4,34 @@
 
 ---
 
+## 2026-04-19（LINE チャンネル二重化セッション: 家族公開前ブロッカー解消）
+
+### 技術的な気づき（LINE チャンネル二重化）
+
+- **Vercel SHA dedup の罠**: 新規ブランチを push しても、HEAD が既存ブランチと**同じ commit SHA を指している**と Vercel は Preview デプロイを作らない。`develop` を `main` から切って即 push しただけだと `DEPLOYMENT_NOT_FOUND` のまま固まる。空 commit (`git commit --allow-empty`) で分岐させると即ビルド開始する。Vercel Dashboard の Deployments タブで該当ブランチの deployment が 1 件も無い場合、まず SHA 重複を疑う
+- **同名 env × 環境別エントリは LINE 系にも有効**: [docs/SETUP.md §8.2](./SETUP.md) の `GITHUB_REPO` で実証済みの「同じキー名で Production と Preview/Development に別値を持つ」パターンを `LINE_CHANNEL_SECRET` / `LINE_CHANNEL_ACCESS_TOKEN` にもそのまま適用できた。**コード変更ゼロ**（[src/lib/env.ts](../src/lib/env.ts) の getter は `process.env[X]` を引くだけで Vercel 側が環境別に注入してくれる）。env getter に環境分岐ロジックを書く案も検討したが、Vercel ネイティブで解ける場面で getter を複雑化するメリットなし
+- **`@line/bot-sdk` v11 の Webhook 署名検証は LINE Verify ボタンの「空 events POST」も同じ署名計算で通る**: 新チャンネルの Webhook URL Verify が即 Success になる前提条件。`validateSignature(rawBody, secret, signature)` の `rawBody` が空文字列 `""` でも署名計算は成立する設計
+
+### UX・会話設計の気づき（LINE チャンネル二重化）
+
+- **手順書の「正」原則**: Claude Code が古い記憶で外部 UI 手順を体当たり推測するのは禁じ手。SETUP.md §2.3 で「Messaging API の利用を有効化」が 1 行で済まされていて、実際は「設定（歯車）→ Messaging API → 「Messaging APIを利用する」→ 既存 Provider 選択」の 4 ステップが必要だったが、ひろゆきさんが Claude in Chrome に逃げて解決する事態になった。今回 SETUP.md §2.3 を加筆 + memory に「外部 UI で確信が持てない手順は Claude in Chrome に質問文を渡す」ルールを保存（`feedback_external_ui_escalation.md`）
+
+### 家族レビューからのフィードバック
+
+- **Bot 応答までの無音が不安**: ひろゆきさん本人の自己レビュー（家族役）から「Bot が反応するまで黙っているのは（LINE では普通だけど）不安になる」の指摘。現状 Gemini 整形 + GitHub 起票で 2-3 秒の沈黙が発生。CS プロ視点では「届いた / 届かない」の区別が無い時間は体験として劣る。Phase 2 で **2 段返信**（受信即「受け取りました、考えてます…」を `replyMessage` で返し、Issue 起票完了後に URL を `pushMessage` で通知）を検討する。B 案（Redis 会話状態機械）と合流させると `gathering` 状態 = 即時 ACK の自然な拡張になるので、合流案が有力（[TASKS.md Phase 2 候補](./TASKS.md) 参照）
+
+### 運用・設計の気づき
+
+- **branch 戦略移行の判定**: [WORKFLOW.md](./WORKFLOW.md) で挙げていた「main 直 → feature branch + PR 移行」のトリガー 4 つのうち、**「変更を本番に反映する前にステージングで家族に触ってもらって寝かせる運用が必要」**が家族公開準備のタイミングで現実化した。LINE チャンネル二重化と branch 運用変更は同時に着手するのが正解（片方だけだと中途半端に「DEV チャンネル無しで develop 運用」or「main 直で DEV チャンネル」になり意味が薄い）
+- **Vercel Preview の固定 URL 命名規則**: `feedback-relay-bot-git-<branch>-<team-slug>.vercel.app` の `<team-slug>` 部分はチーム単位で一意（本プロジェクトでは `hirobirofran-7375s-projects`）。main の既存 alias を見れば develop 用の URL が事前に確定できるので、LINE Webhook URL 設定を develop push 前に下準備しておくことも可能（実際は push → ビルド完了を待ってから Verify する方が安全）
+
+### 次回セッションへの申し送り（LINE チャンネル二重化）
+
+- 家族公開前のブロッカーは全部潰れた。残るは (a) Phase 2 着手（B 案 = Redis 会話状態 or 二段返信、合流案推奨） / (b) [docs/SETUP.md §8](./SETUP.md) の Production 切替（家族公開タイミングで実施） / (c) ラベル運用 / (d) follow event 初回あいさつ、の 4 つの中から優先度判断
+- **本セッションで develop 運用に移行**。今後 Claude Code は原則 develop にコミット → develop → main の PR を切る運用。詳細は [WORKFLOW.md](./WORKFLOW.md) 参照
+- DEV チャンネル運用の継続的な意義は「main 反映前の本人ドッグフード」。Preview デプロイで sandbox リポに起票テストを通せるので、テストスイート未整備の現状でもデグレ検知の手段になる
+- ローカル `.env.local` は TEST モード（sandbox 向き）なので LINE 系に DEV/本番どちらの値を入れても実害なし。通常は DEV チャンネル値を入れて Vercel Preview と環境を揃えるのが推奨（[.env.local.example](../.env.local.example) コメント追記済み）
+
 ## 2026-04-19（Phase 1 仕上げセッション: 返信文リライト + SETUP §8）
 
 ### UX・会話設計の気づき

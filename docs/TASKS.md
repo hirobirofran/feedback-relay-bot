@@ -36,15 +36,16 @@ Phase 0 完了。次は Phase 1 実装（[DESIGN.md §10](./DESIGN.md) の Phase
 - [x] **A 案（単発版）実装 + sandbox リポへの E2E 疎通**（2026-04-19、`feedback-relay-bot-sandbox` private リポ作成、PAT access 追加、Vercel env に `GITHUB_REPO=feedback-relay-bot-sandbox` + `FEEDBACK_BOT_MODE=test` 投入、LINE 実機メッセージで sandbox #1 起票成功、タイトルに `[TEST]` プレフィックス付与確認、Gemini の `## 背景 / ## 期待する動作 / ## 補足 / ## 元メッセージ` セクション構造通り）
 - [x] **Bot 返信 3 文言の家族目線リライト**（2026-04-19、[src/app/api/line/webhook/route.ts](../src/app/api/line/webhook/route.ts) の成功/失敗/非テキスト 3 リプライを「受領感謝 → 何が起きたか → 次の期待行動」の 3 要素で揃え直し。`npm run build` 通過、実機疎通確認は別途）
 - [x] **家族公開前切替手順の書き下し**（2026-04-19、[docs/SETUP.md §8](./SETUP.md) に Production 切替・Redeploy・実機疎通・ロールバックを書き下し。Preview/Development は sandbox 恒久維持してデグレ検知に使う方針を明記。実切替は家族公開タイミングで別途実施）
+- [x] **LINE チャンネル二重化（家族公開前ブロッカー解消）**（2026-04-19、DEV チャンネル「食材アプリ 意見箱 DEV」を同 Provider に新設、Vercel env で `LINE_CHANNEL_SECRET` / `LINE_CHANNEL_ACCESS_TOKEN` を Production = 本番チャンネル / Preview+Development = DEV チャンネルに環境別分割、`develop` ブランチ運用に移行して Preview 固定 URL `feedback-relay-bot-git-develop-hirobirofran-7375s-projects.vercel.app` に DEV チャンネル Webhook を紐付け。DEV/本番 両経路で実機疎通成功。手順は [docs/SETUP.md §7](./SETUP.md)、運用変更は [docs/WORKFLOW.md](./WORKFLOW.md) 参照。これで家族公開前ブロッカーが解消し、§8 Production 切替に進める状態になった）
 
 ### 🔲 次にやること（Phase 2 着手前）
 
-Phase 1 DoD 最短コース到達 + 家族公開前の軽い整備まで完了。以下は Phase 2 移行前の残選択肢:
+Phase 1 DoD 最短コース到達 + 家族公開前ブロッカー解消まで完了。以下は Phase 2 移行前の残選択肢:
 
 - **B: Redis 会話状態 + 状態機械**（`gathering`→`confirming`→`done`、起票前に「これで起票しますか？」の確認ステップ）
 - **ラベル運用**: sandbox / 本丸どちらも `from-family` ラベル整備、Gemini 出力の labels を採用する経路追加
 - **LINE follow event の初回あいさつ実装**（CLAUDE.md §会話設計の初手ルール 1 の未着手分。B 案の会話状態機械と合わせて再検討）
-- **🔴 LINE チャンネル二重化（家族公開前に必須）**: 現状 LINE チャンネル 1 つで Webhook は Production 固定。家族公開後は main push が即家族の Bot に反映される設計になっており、壊れた dev 版が家族に見えるリスク大。テスト用 LINE チャンネル（`食材アプリ 意見箱 DEV` 相当）を追加し、Preview デプロイの固定 URL（develop ブランチ運用 or Vercel Preview alias）に Webhook を向ける。env は `LINE_CHANNEL_SECRET` / `LINE_CHANNEL_ACCESS_TOKEN` を Production と Preview/Development で別値に分割。**家族への友達追加 URL を渡す前に完了必須**
+- **二段返信（即時 ACK → Issue 完了通知）**: 家族レビュー（本人セルフ）から「Bot 応答までの無音が不安」の指摘あり（[KNOWLEDGE.md 2026-04-19 セッション](./KNOWLEDGE.md) 参照）。受信即「受け取りました、考えてます…」を replyMessage で返し、Issue 起票完了で pushMessage で URL を通知する 2 段構成に変更する。B 案の会話状態機械とどちらを先にやるか要検討（B 案の `gathering` 状態 = 即時 ACK の自然な拡張なので、合流させた方がコスト効率が良い可能性）
 
 ## Phase 2: 家族展開（未着手）
 
