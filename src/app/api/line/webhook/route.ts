@@ -10,9 +10,9 @@ import { replyText } from "@/lib/line";
 export const runtime = "nodejs";
 
 const NON_TEXT_REPLY =
-  "すみません、今はテキストメッセージのみ対応しています。";
+  "ありがとうございます、ただ今は文字のメッセージだけお受けしています。お手数ですが文字で送り直していただけると助かります。";
 const ERROR_REPLY =
-  "ごめんなさい、ちょっと調子が悪いみたいです。少し時間を空けてもう一度送ってみてください。";
+  "ごめんなさい、うまく受け取れませんでした。少し時間を空けて、もう一度同じメッセージを送っていただけますか。";
 
 export async function GET(): Promise<Response> {
   return Response.json({ ok: true, path: "/api/line/webhook" });
@@ -96,7 +96,7 @@ async function handleAuthorizedEvent(event: webhook.Event): Promise<void> {
 
   await safeReply(
     replyToken,
-    `起票しました。\n${draft.title}\n${issue.url}`,
+    `受け取りました、ありがとうございます。\n開発メモに追加しました。順に対応していきます。\n${draft.title}\n${issue.url}`,
   );
 }
 
