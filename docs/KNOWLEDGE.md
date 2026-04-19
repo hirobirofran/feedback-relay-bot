@@ -13,6 +13,9 @@
 - LINE Webhook は **署名検証失敗時も 200 を返す** のが安全。4xx/5xx を返すと LINE 側がリトライを走らせ、攻撃者のノイズでリトライ嵐を招く。検証失敗・認可外 userId・JSON 破損はすべて `console.warn` でログに残して 200 返却が定石
 - `export const runtime = "nodejs"` を明示しないと Vercel が Edge ランタイムを選ぶ可能性がある。`@line/bot-sdk` の署名検証は Node `crypto` 依存なので明示必須
 - Markdownlint の MD024 は見出しレベル跨ぎでも重複警告を出す。Phase 0 / Phase 1 で同じ絵文字見出しを使うとぶつかるので `### ✅ 完了（Phase 1）` のように段階名を付けて区別する
+- **初回 userId 回収フロー**（Phase 1 で実測）: `ALLOWED_LINE_USER_IDS` は Phase 0 では未設定のまま置き、Phase 1 で Webhook 実装後の初回メッセージ送信で `[line-webhook] unauthorized userId=U...` ログから拾う手順が正解。このログが出るのは**エラーではなく設計上の受け入れ挙動**。`ALLOWED_LINE_USER_IDS` 事前入手は不可能（LINE Console から自分の userId を直接見ることもできない）なので、この「初回 unauthorized → 拾う → 投入 → 再デプロイ」の 4 ステップを正式フローとしてドキュメント化済み（[SETUP.md §6.5.3](./SETUP.md#653-初回-userid-の回収と投入ここが-phase-1-特有)）
+- Vercel の環境変数追加は**再デプロイ必須**。env を UI で保存しただけでは動いているデプロイには反映されない。最新デプロイの Redeploy（Build Cache 利用 OK）で即反映される
+- 当初 [docs/SETUP.md §6.5](./SETUP.md) に書いていた Webhook パスは `/api/webhook/line` だったが、実装時に App Router のディレクトリ構造上 `/api/line/webhook` の方が素直だったので変更。**事前に書いた手順書のパスは実装時に乖離しやすい**ので、疎通確認時に必ず手順書側を書き戻す
 
 ## 2026-04-19（Phase 0 完了セッション）
 

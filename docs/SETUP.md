@@ -433,11 +433,45 @@ Next.js アプリと API Route を Vercel の Hobby プラン（無料）で本�
 
 3. [docs/TASKS.md](./TASKS.md) の Phase 0 完了リストに「Vercel プロジェクト作成 + 初回デプロイ成功」「本番 URL: （確定した URL）」を記録
 
-### 6.5 Phase 1 で追加する作業
+### 6.5 Phase 1 Webhook 疎通手順（実測済み 2026-04-19）
 
-Phase 1 実装後に以下を行う:
+Phase 1 の Webhook スケルトン（[src/app/api/line/webhook/route.ts](../src/app/api/line/webhook/route.ts)）が main に入って Vercel 自動デプロイが Ready になった後、以下の順で疎通を確認する。
 
-- `src/app/api/webhook/line/route.ts` を実装 → push → Vercel 自動デプロイ
-- LINE Developers Console の **Webhook URL** に `https://<本番URL>/api/webhook/line` を入力 → **Use webhook** を ON
-- LINE Official Account Manager の **Webhook** トグルを ON
-- LINE から初回メッセージを送信 → Vercel Logs で userId を確認 → `.env.local` と Vercel env の `ALLOWED_LINE_USER_IDS` に記入 → 再デプロイ
+#### 6.5.1 GET ヘルスチェック
+
+```bash
+curl -s https://feedback-relay-bot.vercel.app/api/line/webhook
+# 期待: {"ok":true,"path":"/api/line/webhook"}
+```
+
+401 が返る場合は Deployment Protection が ON に戻っている（§6.3 参照）。404 の場合はまだデプロイ反映前。
+
+#### 6.5.2 LINE Developers Console で Webhook URL 設定
+
+1. [LINE Developers Console](https://developers.line.biz/console/) → Provider `hirobirofran` → 該当 Messaging API チャンネル
+2. **Messaging API** タブ → **Webhook settings**
+3. **Webhook URL** に `https://feedback-relay-bot.vercel.app/api/line/webhook` を入力 → **Update**
+4. **Use webhook** トグルを **ON**
+5. **Verify** ボタンを押下 → `Success.` 表示を確認
+   - 仕組み: LINE は空 events の POST を送ってくる。`validateSignature` はこのリクエストにも正しい署名を付けてくるので通る
+6. LINE Official Account Manager の **応答設定** → **Webhook** トグルも **ON**（Console 側だけでは足りないケースあり）
+
+#### 6.5.3 初回 userId の回収と投入（ここが Phase 1 特有）
+
+**理由**: `ALLOWED_LINE_USER_IDS` は Phase 0 時点ではまだ自分の userId を知らないので未設定。Webhook が初めてメッセージを受けたときの `unauthorized` ログから userId を拾う必要がある。これは Phase 1 の**正常フロー**であり、エラーではない。
+
+1. LINE アプリから Bot にメッセージ送信（内容は何でも可、例: `テスト`）
+2. Vercel Dashboard → feedback-relay-bot → **Logs** タブ（または最新デプロイの Inspector → **Runtime Logs**）
+3. `[line-webhook] unauthorized userId=U<32 文字> type=message` の行を探す
+4. `U` で始まる 33 文字をコピー（チャットや外部には貼らない。Vercel 画面内で完結させる）
+5. Vercel Dashboard → **Settings** → **Environment Variables** → **Add New**
+   - Key: `ALLOWED_LINE_USER_IDS`
+   - Value: 上記の userId 1 件（複数の場合はカンマ区切り、例: `U111,U222`）
+   - Environments: **Production / Preview / Development** 全てにチェック → **Save**
+6. **再デプロイが必要**。最新デプロイの `⋯` → **Redeploy**（Use existing Build Cache のままで OK）
+7. Ready になってから LINE に再度メッセージ送信
+8. ログに `[line-webhook] received authorized event type=message userId=U...` が出れば疎通完了
+
+#### 6.5.4 `.env.local` への反映
+
+ローカル dev で同じ userId で試せるように、`.env.local` の `ALLOWED_LINE_USER_IDS=` にも同じ値を入れておく。`.env.local.example` には**値を貼らない**（プレースホルダのまま）。

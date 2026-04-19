@@ -31,15 +31,17 @@ Phase 0 完了。次は Phase 1 実装（[DESIGN.md §10](./DESIGN.md) の Phase
 - [x] 依存パッケージ投入（2026-04-19、`@line/bot-sdk` `@upstash/redis` `@google/generative-ai` `@octokit/rest`）
 - [x] LINE Webhook スケルトン（2026-04-19、[src/app/api/line/webhook/route.ts](../src/app/api/line/webhook/route.ts) に署名検証 + ホワイトリスト認証 + 常に 200 応答、GET ヘルスチェック付き。ローカル `npm run build` / `curl` 疎通確認済み。Vercel 本番反映・LINE Webhook URL 設定は未実施）
 - [x] env ヘルパー作成（2026-04-19、[src/lib/env.ts](../src/lib/env.ts)）
+- [x] Vercel 本番デプロイ + LINE Webhook URL 設定 + Verify 成功（2026-04-19、本番 `https://feedback-relay-bot.vercel.app/api/line/webhook`）
+- [x] 初回 userId 回収 + `ALLOWED_LINE_USER_IDS` 投入 + 再デプロイ（2026-04-19、実機メッセージで `received authorized event` ログ確認済み。手順は [SETUP.md §6.5.3](./SETUP.md#653-初回-userid-の回収と投入ここが-phase-1-特有)）
 
 ### 🔲 次にやること（Phase 1）
 
-1. main ブランチに push → Vercel 本番デプロイ確認
-2. LINE Developers Console で Webhook URL を `https://feedback-relay-bot.vercel.app/api/line/webhook` に設定、Webhook 利用 ON、Verify ボタンで 200 応答確認
-3. 実機（ひろゆきさん自身の LINE）からメッセージ送信 → Vercel Functions ログに `[line-webhook] received authorized event` が出ることを確認
-4. 次ステップ候補（別セッションで見積もる）:
-   - A: Gemini + GitHub 起票の単発版（会話状態なし、1 メッセージ → Issue 直起票）
-   - B: Redis 会話状態 + `gathering`→`confirming`→`done` 状態機械
+LINE → Vercel の配管は通った。残りは会話ロジック:
+
+- A: Gemini + GitHub 起票の単発版（会話状態なし、1 メッセージ → Issue 直起票、Phase 1 DoD 最短コース）
+- B: Redis 会話状態 + `gathering`→`confirming`→`done` 状態機械
+
+A / B どちらから着手するかは別セッション冒頭で見積もり提示して判断する。
 
 ## Phase 2: 家族展開（未着手）
 
