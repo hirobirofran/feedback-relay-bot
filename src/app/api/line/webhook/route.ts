@@ -96,7 +96,7 @@ async function handleAuthorizedEvent(event: webhook.Event): Promise<void> {
 
   await safeReply(
     replyToken,
-    `受け取りました、ありがとうございます。\n開発メモに追加しました。順に対応していきます。\n${draft.title}\n${issue.url}`,
+    `受け取りました、ありがとうございます。\n開発メモ #${issue.number} に追加しました。順に対応していきます。\nタイトル：${draft.title}\n${issue.url}`,
   );
 }
 
