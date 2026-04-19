@@ -9,6 +9,10 @@ import { replyText } from "@/lib/line";
 
 export const runtime = "nodejs";
 
+const PII_NOTICE =
+  "※ 次の投稿でも、個人情報（お名前・住所・電話番号・健康情報など）は書かないでください。開発メモは公開リポジトリに残ります。";
+const FOLLOW_GREETING =
+  "こんにちは、食材管理アプリのフィードバック窓口です。\n使ってみて気になったこと・改善してほしいことをカジュアルに送ってください。開発メモに記録します。\n\n※ 個人情報（お名前・住所・電話番号・健康情報など）は書かないでください。開発メモは公開リポジトリに残ります。";
 const NON_TEXT_REPLY =
   "ありがとうございます、ただ今は文字のメッセージだけお受けしています。お手数ですが文字で送り直していただけると助かります。";
 const ERROR_REPLY =
@@ -64,6 +68,12 @@ export async function POST(request: Request): Promise<Response> {
 }
 
 async function handleAuthorizedEvent(event: webhook.Event): Promise<void> {
+  if (event.type === "follow" && event.replyToken) {
+    console.log("[line-webhook] follow event, sending greeting");
+    await safeReply(event.replyToken, FOLLOW_GREETING);
+    return;
+  }
+
   if (event.type !== "message" || !event.replyToken) {
     console.log(`[line-webhook] skip non-message event type=${event.type}`);
     return;
@@ -96,7 +106,7 @@ async function handleAuthorizedEvent(event: webhook.Event): Promise<void> {
 
   await safeReply(
     replyToken,
-    `受け取りました、ありがとうございます。\n開発メモ #${issue.number} に追加しました。順に対応していきます。\nタイトル：${draft.title}\n${issue.url}`,
+    `受け取りました、ありがとうございます。\n開発メモ #${issue.number} に追加しました。順に対応していきます。\nタイトル：${draft.title}\n${issue.url}\n\n${PII_NOTICE}`,
   );
 }
 

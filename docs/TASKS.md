@@ -36,16 +36,26 @@ Phase 0 完了。次は Phase 1 実装（[DESIGN.md §10](./DESIGN.md) の Phase
 - [x] **A 案（単発版）実装 + sandbox リポへの E2E 疎通**（2026-04-19、`feedback-relay-bot-sandbox` private リポ作成、PAT access 追加、Vercel env に `GITHUB_REPO=feedback-relay-bot-sandbox` + `FEEDBACK_BOT_MODE=test` 投入、LINE 実機メッセージで sandbox #1 起票成功、タイトルに `[TEST]` プレフィックス付与確認、Gemini の `## 背景 / ## 期待する動作 / ## 補足 / ## 元メッセージ` セクション構造通り）
 - [x] **Bot 返信 3 文言の家族目線リライト**（2026-04-19、[src/app/api/line/webhook/route.ts](../src/app/api/line/webhook/route.ts) の成功/失敗/非テキスト 3 リプライを「受領感謝 → 何が起きたか → 次の期待行動」の 3 要素で揃え直し。`npm run build` 通過、実機疎通確認は別途）
 - [x] **家族公開前切替手順の書き下し**（2026-04-19、[docs/SETUP.md §8](./SETUP.md) に Production 切替・Redeploy・実機疎通・ロールバックを書き下し。Preview/Development は sandbox 恒久維持してデグレ検知に使う方針を明記。実切替は家族公開タイミングで別途実施）
-- [x] **LINE チャンネル二重化（家族公開前ブロッカー解消）**（2026-04-19、DEV チャンネル「食材アプリ 意見箱 DEV」を同 Provider に新設、Vercel env で `LINE_CHANNEL_SECRET` / `LINE_CHANNEL_ACCESS_TOKEN` を Production = 本番チャンネル / Preview+Development = DEV チャンネルに環境別分割、`develop` ブランチ運用に移行して Preview 固定 URL `feedback-relay-bot-git-develop-hirobirofran-7375s-projects.vercel.app` に DEV チャンネル Webhook を紐付け。DEV/本番 両経路で実機疎通成功。手順は [docs/SETUP.md §7](./SETUP.md)、運用変更は [docs/WORKFLOW.md](./WORKFLOW.md) 参照。これで家族公開前ブロッカーが解消し、§8 Production 切替に進める状態になった）
+- [x] **LINE チャンネル二重化（家族公開前ブロッカー解消）**（2026-04-19、DEV チャンネル「食材アプリ 意見箱 DEV」を同 Provider に新設、Vercel env で `LINE_CHANNEL_SECRET` / `LINE_CHANNEL_ACCESS_TOKEN` を Production = 本番チャンネル / Preview+Development = DEV チャンネルに環境別分割、`develop` ブランチ運用に移行して Preview 固定 URL `feedback-relay-bot-git-develop-hirobirofran-7375s-projects.vercel.app` に DEV チャンネル Webhook を紐付け。DEV/本番 両経路で実機疎通成功。手順は [docs/SETUP.md §7](./SETUP.md)、運用変更は [docs/WORKFLOW.md](./WORKFLOW.md) 参照）
+- [x] **Gemini CLI プレイグラウンド整備**（2026-04-19、[scripts/try-gemini.ts](../scripts/try-gemini.ts) + `npm run try:gemini -- "..."`。tsx + `--env-file=.env.local` で dotenv 追加なし。Step 3 以降のプロンプト調整をローカル秒サイクルで回すための下準備。初回実行で「12 文字の曖昧入力から Gemini が推測膨らませ Issue を生成する地雷」を目視確認）
+- [x] **テストケース MD 叩き**（2026-04-19、[docs/TEST_CASES.md](./TEST_CASES.md) にケース 8 件 + 観点 5 つ + Step 1 文言案を同梱。ひろゆきさんレビューでケース #1 を「対象外 (scope_reject)」に修正、他は OK）
+- [x] **PII 警告の返信文差し込み + follow event 初回あいさつ**（2026-04-19、[src/app/api/line/webhook/route.ts](../src/app/api/line/webhook/route.ts) に `PII_NOTICE` / `FOLLOW_GREETING` 定数追加、成功返信末尾に PII 警告、follow event ハンドラで初回あいさつ。`npm run build` 通過。CLAUDE.md §会話設計の初手ルール 1「初回メッセージは決め打ち」も同時回収。実機疎通は Preview 反映後）
 
-### 🔲 次にやること（Phase 2 着手前）
+### 🔲 次にやること（Phase 1 MVP 残タスク: 壁打ち価値の実装）
 
-Phase 1 DoD 最短コース到達 + 家族公開前ブロッカー解消まで完了。以下は Phase 2 移行前の残選択肢:
+**MVP 再定義の経緯**: 「最小機能」と「最小価値」を混同していた分類を見直し、[DESIGN.md §1-2](./DESIGN.md) の核心価値「AI 窓口が壁打ちで情報を引き出す」を提供できるまでを Phase 1 MVP とする（[docs/KNOWLEDGE.md 2026-04-19 価値駆動 MVP 再定義セッション](./KNOWLEDGE.md) 参照）。以下は現状の単発フォーマッタ版では提供できていない価値を埋めるための必須タスク:
 
-- **B: Redis 会話状態 + 状態機械**（`gathering`→`confirming`→`done`、起票前に「これで起票しますか？」の確認ステップ）
+- [ ] **Step 2: Redis 会話状態 CRUD ラッパ** (`src/lib/conversation.ts` 新規、`gathering`/`confirming`/`done` の 3 状態、TTL 24h、Upstash HTTP で単体確認可)
+- [ ] **Step 3: Gemini プロンプトを分岐出力 + PII/scope ゲートに改修**（`gathering`: 質問返す / `confirming`: Draft 提示 / `pii_reject`: 言い換え依頼 / `scope_reject`: 窓口守備範囲を説明してアプリの話を促す。`scripts/try-gemini.ts` を拡張して [docs/TEST_CASES.md](./TEST_CASES.md) 全 8 ケース走らせ → `docs/tmp/gemini-runs-YYYYMMDD.md` 吐出し → ひろゆきさんまとめ読み）
+- [ ] **Step 4: webhook で状態分岐実装**（「はい」応答検出 → `createIssue`、修正/薄入力 → `gathering` 戻し、`pii_reject`/`scope_reject` → 起票せず返信のみ）
+- [ ] **Step 5: DEV チャンネル + sandbox リポで LINE 実機疎通**（テストケース 8 件を LINE から流し、Preview の Vercel ログと Issue 内容を確認）
+- [ ] **Step 6: §8 Production 切替（家族公開）**（[docs/SETUP.md §8](./SETUP.md) に従い env 差替え + Redeploy + 実機疎通）
+
+### 🔲 Phase 2 以降へ繰り越し（MVP 公開後の課題）
+
+- **PII 対策の強化**: 正規表現プレフィルタ・マスキング・監査ログ（MVP は Bot 警告 + Gemini 目視ゲートの簡易 2 段のみ）
+- **二段返信（即時 ACK → Issue 完了通知）**: 家族レビュー（本人セルフ）から「Bot 応答までの無音が不安」の指摘あり（[KNOWLEDGE.md 2026-04-19 LINE チャンネル二重化セッション](./KNOWLEDGE.md) 参照）。B 案の `gathering` 状態 = 即時 ACK の自然な拡張なので、Step 2〜4 完了後に合流設計する
 - **ラベル運用**: sandbox / 本丸どちらも `from-family` ラベル整備、Gemini 出力の labels を採用する経路追加
-- **LINE follow event の初回あいさつ実装**（CLAUDE.md §会話設計の初手ルール 1 の未着手分。B 案の会話状態機械と合わせて再検討）
-- **二段返信（即時 ACK → Issue 完了通知）**: 家族レビュー（本人セルフ）から「Bot 応答までの無音が不安」の指摘あり（[KNOWLEDGE.md 2026-04-19 セッション](./KNOWLEDGE.md) 参照）。受信即「受け取りました、考えてます…」を replyMessage で返し、Issue 起票完了で pushMessage で URL を通知する 2 段構成に変更する。B 案の会話状態機械とどちらを先にやるか要検討（B 案の `gathering` 状態 = 即時 ACK の自然な拡張なので、合流させた方がコスト効率が良い可能性）
 
 ## Phase 2: 家族展開（未着手）
 
