@@ -8,6 +8,125 @@
 
 ## 2. LINE Messaging API の設定
 
+家族とのフィードバック会話の入口となる LINE 公式アカウント (= Messaging API チャンネル)。家族 LINE から 1:1 チャットで送信 → Vercel の Webhook が受信 → Bot 返信という構成。
+
+> **Claude Code への指示:** LINE Developers Console の UI は頻繁に変わる。手順書は**目的の値（Channel Secret、Channel Access Token、LINE 公式アカウントの友達追加 URL）が取れる**ことを優先し、UI のボタン位置等に固執しない。迷ったら画面開いた状態でブラウザ側 AI（Claude in Chrome 等）に現在 UI でのガイドを頼む。
+
+### LINE 方針サマリ
+
+- **チャンネル種別**: Messaging API
+- **プラン**: フリープラン（月 200 通まで無料メッセージ送信。家族規模で十分）
+- **応答設定**: 自動応答・あいさつ・グループチャットは **OFF**（Bot 側で全応答を制御するため）
+- **Webhook URL**: Phase 0 時点は未設定 or ダミー。Phase 1 で Vercel 本番 URL に差し替え
+- **認証設計**: `ALLOWED_LINE_USER_IDS` ホワイトリスト + 署名検証で不特定多数の起票を防ぐ（[DESIGN.md §7](./DESIGN.md) 参照）
+
+### 2.1 LINE Business ID 登録（初回のみ）
+
+LINE Developers Console は **LINE Business ID** という独立のアカウント体系。普段使いの LINE アカウント（スマホの LINE アプリ）とは別物だが、それと紐づける形で作る。
+
+1. <https://developers.line.biz/console/> にアクセス
+2. 「Log in with LINE」を選択し、個人の LINE アカウントでログイン
+3. 初回はメールアドレス登録と認証メール確認を求められる → ひろゆきさんのメールアドレスで認証
+4. 開発者名（Developer Name、公開されない管理用）を入力して登録完了
+
+### 2.2 Provider 作成
+
+Provider は複数のチャンネルをまとめる会社/組織単位のコンテナ。個人でも 1 個は必要。
+
+1. Console のトップで **Create a new provider**
+2. Provider name: `hirobirofran`（または任意。公開されないので後で変更可）
+3. Create
+
+> 将来、食材管理アプリや他の Bot も同じ Provider にぶら下げられる。この段階で分ける必要はない。
+
+### 2.3 Messaging API チャンネル作成（LINE 公式アカウント経由）
+
+> **UI 変更あり（2024-09 時点）**: LINE Developers Console から Messaging API チャンネルを直接作成する導線は**廃止**された。まず Official Account Manager で LINE 公式アカウントを作成 → Messaging API を有効化する順序になる。チャンネル自体は最後に Developers Console 側へ自動的に出現する。
+
+1. Developers Console の Provider 画面で **Create a new channel** → Messaging API の枠にある **「LINE公式アカウントを作成する」** 緑ボタンを押す → `manager.line.biz` に遷移
+2. LINE Official Account Manager で以下を入力:
+
+    | 項目 | 値 |
+    | --- | --- |
+    | アカウント名 | `食材アプリ 意見箱`（**7 日間変更不可**。家族の LINE 連絡先に出る名前なので慎重に） |
+    | メールアドレス | 受信用メール |
+    | 会社・事業者の所在国・地域 | `日本` |
+    | 業種（大業種／小業種） | `個人` → `個人（IT・コンピュータ）` |
+    | 運用目的 | `お問い合わせに対応したい` ・ `お客さんとチャットしたい` 等 |
+    | 主な使い方 | `チャット・LINEコール用` |
+    | 接続先の組織 | ビジネスマネージャーの組織名を入力（例: `食材管理アプリ フィードバック窓口`）。これは OA 側の組織コンテナで Provider とは別概念 |
+
+3. 規約同意 → **作成**
+4. Official Account Manager の設定画面で **Messaging API** の利用を有効化
+5. Provider 選択ダイアログで **既存の `hirobirofran` を選ぶ**（新規作成しない。管理がバラける）
+6. 有効化完了 → Developers Console に戻るとチャンネルが自動で出現している
+
+作成直後にここで一旦休憩可能。続きは 2.4 以降（チャンネル設定と Token 取得）。
+
+### 2.4 Channel Secret と Channel Access Token の取得
+
+この作業は **LINE Developers Console 側** で行う（Official Account Manager では Channel secret / Access token は表示されない）。Official Account Manager 画面の「その他の設定は LINE Developers コンソールから行えます」リンクから遷移するのが早い。
+
+1. Developers Console の対象チャンネルを開く
+2. **Basic settings** タブ → 下にスクロール → **Channel secret** をコピー
+3. **Messaging API** タブに切り替え（最初に開いた時点では「Messaging API 未有効化」状態のことがある。その場合はタブ内の **Enable Messaging API** を押して有効化）
+4. **Channel access token** セクションの **Issue** をクリックして長期トークンを発行 → コピー（再表示可能）
+5. `.env.local` に追記:
+
+    ```env
+    LINE_CHANNEL_SECRET=（コピーした Channel secret）
+    LINE_CHANNEL_ACCESS_TOKEN=（コピーした Channel access token）
+    ```
+
+6. `.env.local` が ignore されていることを確認:
+
+    ```bash
+    git check-ignore .env.local
+    ```
+
+### 2.5 応答設定を Bot 専用に切り替え
+
+デフォルトだと LINE 側のあいさつ文・自動応答が ON になっていて Bot の返信と競合する。Phase 0 では 2 項目だけ OFF にして、Webhook は Phase 1 で Vercel URL 設定と同時に ON にする（URL 未設定では Webhook を ON にできない LINE 仕様のため）。
+
+1. <https://manager.line.biz/> で対象アカウント（例: `食材アプリ 意見箱`）を開く
+2. 左メニューの **設定** → **応答設定** (`.../setting/response`)
+3. 以下を操作:
+
+    | UI 項目（現行） | 設定 | 備考 |
+    | --- | --- | --- |
+    | チャット | **オフ**（= Bot モード） | 新 UI では旧「応答モード」を「チャット」トグル単独で表現。オフ = Bot 優先 |
+    | あいさつメッセージ | **オフ** | Bot 側で決め打ち文を返すため |
+    | 応答メッセージ | **オフ** | Bot が全応答を管理 |
+    | Webhook | オフのまま（**Phase 1 で ON**） | Webhook URL が空だと ON にできない。Phase 1 で Vercel URL 設定と同時に切り替え |
+
+4. グループ・複数人トーク参加は（UI にあれば）**オフ** に。UI から消えている場合は無視でよい
+
+> **UI ラベル変更の履歴**: 旧手順書は「応答モード = Bot」「あいさつメッセージ 無効」「応答メッセージ 無効」「Webhook 有効」の 4 項目を想定。現行 UI は「チャット」「あいさつメッセージ」「応答メッセージ」「Webhook」の 4 トグル構成。目的は同じ（Bot がすべての応答を制御）。
+>
+> **既知のハマりどころ**: LINE の応答設定は Developers Console と Official Account Manager の 2 箇所で同期される。片方だけ変更しても反映されないことがあるので、疑問があれば両方を確認する。
+
+### 2.6 友達追加の確認
+
+1. LINE 公式アカウント作成時、本人の LINE アカウントは**自動で友達追加済み**の場合がある（LINE Business ID 経由のログインのため）
+2. 念のため QR コード読み取りでも確認可能:
+   - **Developers Console** の **Messaging API** タブ下部の **QR code**、または
+   - **Official Account Manager** の **ホーム** → **友だちを増やす** 配下の QR コード
+3. スマホの LINE トーク一覧で当該アカウントが表示されればメッセージ送信可能な状態
+
+> **userId は Phase 1 で取得**: `ALLOWED_LINE_USER_IDS` に入れる値は、友達追加後に実際にメッセージを送って Webhook が受信したときのログから取れる。Phase 0 時点ではプレースホルダのまま（`.env.local.example` の値を参照）。Phase 1 で Webhook を実装したら、初回メッセージ受信のログから userId をコピーして `.env.local` と Vercel env に入れる運用にする。
+
+### 2.7 更新手順（Token 再発行時）
+
+Channel Secret は原則変更しない（漏洩時のみ）。Channel Access Token は Developers Console → **Messaging API** タブ → **Reissue** で再発行できる（旧トークン即無効）。
+
+1. Developers Console の対象チャンネルを開く
+2. **Messaging API** タブ → **Channel access token** → **Reissue**
+3. `.env.local` の `LINE_CHANNEL_ACCESS_TOKEN` を書き換え
+4. Vercel 環境変数 `LINE_CHANNEL_ACCESS_TOKEN` を書き換え（UI から直接入力）
+5. Vercel で再デプロイ、LINE から test メッセージを送って疎通確認
+
+期限の概念は無いので定期更新は不要。漏洩時のみ。
+
 ## 3. Upstash Redis の設定
 
 LINE ユーザーごとの会話状態（`state`・`messages`・`draft`）を保持するストレージ。24 時間 TTL で自動消滅。Vercel のサーバーレス関数から HTTP REST で叩くので、通常の Redis SDK ではなく `@upstash/redis` を使う。
