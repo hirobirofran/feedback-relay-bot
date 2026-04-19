@@ -29,6 +29,14 @@
 - #2 着手時は [TASKS.md](./TASKS.md) の Phase 1 定義を「Private ドラフトリポ経由で家族公開まで」に書き換える必要あり。現状 Phase 1 MVP の Step 6 が「Production 切替 = Public 直接起票で家族公開」になっているため
 - #3 の「Max OAuth 認証裏取り」は Phase 1 MVP 進行と独立して着手可能。ブロッカー解除タスクとして時間が余った時に回すのが合理的
 
+### 次回セッションへの申し送り（作業完了の定義 / WORKFLOW.md 追記案）
+
+- 本セッション中、Claude が docs 更新を commit までで止めて push せず、ひろゆきさんから「プッシュしてません」と指摘を受けた。原因は [WORKFLOW.md](./WORKFLOW.md) に push 運用の記述が無かったこと（commit 粒度と PR 運用は書かれているが、commit → push のタイミングが空白）
+- 応急対応として [CLAUDE.md 重要ルール](../CLAUDE.md#重要ルール) に **作業完了の定義 = ローカルクリーン + リモート push 済み** を 1 行追記した（手順ではなく終わりの定義として）
+- **後日やること（要説明）**: [WORKFLOW.md](./WORKFLOW.md) の「コミット粒度」章または新章に、push タイミングの手順ルールを追加する。Claude が提案した具体案は下記だが、ひろゆきさんは「提案の意味がよくわからない」との反応だったので、次回セッションで改めて説明して合意を取ってから書き込む
+  - 提案内容（未合意）: 「Claude Code は commit 後に `git push origin <current-branch>` まで自動実行する（develop → Vercel Preview 即反映で DEV チャンネル動作確認につなげるため）。force push・main への直接 push は事前確認必須」
+  - 説明ポイントの候補: (a) なぜ commit だけでは不十分か（Vercel Preview が反映されない → DEV チャンネルでドッグフード不可）、(b) 複数 commit を貯めて最後にまとめ push する運用と、1 commit = 1 push の運用の違い、(c) force push 禁止の明文化との組み合わせ
+
 ---
 
 ## 2026-04-19（価値駆動 MVP 再定義 + ローカル開発体制セッション）
