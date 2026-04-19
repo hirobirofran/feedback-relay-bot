@@ -50,21 +50,19 @@ Conventional Commits + scope を採用。既存 commit log にならう:
 
 ## ブランチ・PR 運用
 
-**現在（イニシャル期）**: main 直コミットで進める。
+**現在（develop ブランチ運用期、2026-04-19〜）**: `develop → main` の PR 運用。
 
-- 理由: ソロ開発 + レビュー窓が「家族 = プロダクト評価観点」で **コード review は不要**。コードレビューに相当する品質担保は `docs/TASKS.md` の DoD チェックリストで代替
-- Vercel は main push 即デプロイなので、動作確認のたびにブランチを切る手間もない
+- **環境マッピング**:
+  - `main` → Vercel Production → **本番 LINE チャンネル「食材アプリ 意見箱」**（家族が見ている）
+  - `develop` → Vercel Preview（固定 URL `feedback-relay-bot-git-develop-<team>.vercel.app`）→ **DEV LINE チャンネル「食材アプリ 意見箱 DEV」**（本人のみ）
+- **基本フロー**: `develop` で実装・コミット → 本人が DEV チャンネルで触って確認 → 必要なら寝かせる → `develop → main` の PR を作成 → ひろゆきさんが GitHub UI でマージ → main 反映で家族の Bot が更新される
+- **Claude Code がコミットする先**: 原則 `develop`。main 直コミット禁止（緊急 hotfix で main から短命 fix branch を切るパターンは可、その場合は事前確認）
+- **PR 作成方針**: コミット粒度（前章）に従って自然な単位で develop に積み、ある程度まとまったら PR を切る。1 PR = 複数 commit で OK（むしろ過剰に PR を分けない）。PR title は最大の commit message を流用、body には変更点と動作確認結果を箇条書き
+- **マージ方針**: `Squash and merge` ではなく **通常の Merge commit**（commit 履歴を残して develop と main の対応を追えるようにする）
 
-**移行タイミング（= feature branch + PR を導入する時）**
+**移行の経緯（2026-04-19）**: 「移行タイミング」リストの 2 つめ「変更を本番に反映する前にステージングで家族に触ってもらって寝かせる運用が必要」が家族公開準備のタイミングで現実化。Vercel Preview + DEV LINE チャンネルの二重化（[docs/SETUP.md §7](./SETUP.md)）と同時に develop 運用へ移行した。
 
-以下のどれかに該当したら main 直運用を終える:
-
-- 2 人目以降の開発者（Claude 以外）が入る
-- 「変更を本番に反映する前にステージングで家族に触ってもらって 1 日寝かせる」運用が必要になった
-- 複数の機能を並行開発するため branch で分離する必要が出た
-- Phase 2 以降、壊すと家族が困るリスクが上がった
-
-移行時は本ファイルに「20YY-MM-DD 以降は feature branch + PR 運用」と追記する。
+**過去の運用（イニシャル期、〜2026-04-19）**: main 直コミット運用。理由はソロ開発 + 家族レビュアーで code review 不要、Vercel が main push 即デプロイなので branch を切る手間が無かったため。Phase 1 完了までこのモードで進めた。
 
 ## 参照
 

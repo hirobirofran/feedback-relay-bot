@@ -57,9 +57,14 @@ Provider は複数のチャンネルをまとめる会社/組織単位のコン�
     | 接続先の組織 | ビジネスマネージャーの組織名を入力（例: `食材管理アプリ フィードバック窓口`）。これは OA 側の組織コンテナで Provider とは別概念 |
 
 3. 規約同意 → **作成**
-4. Official Account Manager の設定画面で **Messaging API** の利用を有効化
-5. Provider 選択ダイアログで **既存の `hirobirofran` を選ぶ**（新規作成しない。管理がバラける）
-6. 有効化完了 → Developers Console に戻るとチャンネルが自動で出現している
+4. Official Account Manager で Messaging API を有効化:
+    1. 作成完了画面 / OA ホームから対象アカウントを開く
+    2. 画面**右上の歯車アイコン（設定）** → 左メニュー **「Messaging API」** をクリック
+    3. **「Messaging APIを利用する」** ボタンを押す
+    4. プロバイダー選択ダイアログ → **「既存のプロバイダーを選択」** → **`hirobirofran`** を選ぶ（新規作成しない。管理がバラける）
+    5. プライバシーポリシー / 利用規約 URL は**空欄のまま OK**（後から追加可）
+    6. 同意にチェック → **OK**
+5. 有効化完了 → Developers Console (`https://developers.line.biz/console/`) のタブをリロードすると `hirobirofran` プロバイダー配下にチャンネルが自動で出現している
 
 作成直後にここで一旦休憩可能。続きは 2.4 以降（チャンネル設定と Token 取得）。
 
@@ -476,14 +481,74 @@ curl -s https://feedback-relay-bot.vercel.app/api/line/webhook
 
 ローカル dev で同じ userId で試せるように、`.env.local` の `ALLOWED_LINE_USER_IDS=` にも同じ値を入れておく。`.env.local.example` には**値を貼らない**（プレースホルダのまま）。
 
-## 7. （欠番・予約）
+## 7. LINE チャンネル二重化（DEV チャンネル新設）
 
-Phase 2（Redis 会話状態機械 / 会話設計の見直し）の手順枠として欠番扱い。実装着手時にここを埋める。
+家族公開後に「main へ壊れた変更を入れたら即家族の Bot に反映される」リスクを避けるため、本番チャンネルとは別に **DEV 用 LINE チャンネル**を立て、Vercel Preview デプロイ（`develop` ブランチ）に紐付ける。これにより `develop` ブランチで本人が触って寝かせてから main にマージ、という運用が可能になる。
+
+> **Claude Code への指示:** 本セクションは「家族公開前に必ず完了させる」位置付け（[TASKS.md](./TASKS.md) ブロッカー）。実装は §2.3〜§2.6 の本番チャンネル作成手順を**そのまま再利用**する。差分は §7.2 の表のみ。
+
+### 7.1 方針
+
+- **DEV チャンネル**: 同じ Provider `hirobirofran` 配下に「食材アプリ 意見箱 DEV」を新設。本人のみ友達追加。**家族に QR / URL を絶対渡さない**（誤友達追加防止のためアイコンも本番と区別できるものにする）
+- **Vercel 環境マッピング**: Production = main → 本番チャンネル / Preview + Development = `develop` → DEV チャンネル
+- **env 戦略**: `LINE_CHANNEL_SECRET` / `LINE_CHANNEL_ACCESS_TOKEN` は同名キーで環境別に値を分ける（§8.2 の `GITHUB_REPO` と同パターン）。**コード変更不要**
+- **ホワイトリスト**: `ALLOWED_LINE_USER_IDS` は全環境共通（本人 userId のみ）
+
+### 7.2 DEV チャンネル新設（§2.3〜§2.6 の差分のみ）
+
+作成フローは本番チャンネルと同じ（§2.3〜§2.6）。以下の差分だけ意識する:
+
+| 工程 | 差分 |
+| --- | --- |
+| §2.3 OA 作成 | アカウント名を `食材アプリ 意見箱 DEV` にする（7 日間変更不可なので注意）。Provider 選択ダイアログでは**既存の `hirobirofran` を選ぶ** |
+| §2.4 Token 取得 | `.env.local` には書かない（ローカルは TEST モードで sandbox リポに向くだけなので DEV/本番どちらでも実害ないが、**手元のメモ帳に控える**だけにして §7.3 で Vercel UI に直接入力するのが安全） |
+| §2.5 応答設定 | 本番と同じ（チャット OFF / あいさつ OFF / 応答 OFF / Webhook はいったん OFF） |
+| §2.6 友達追加 | **本人のみ**。家族には QR / URL を絶対渡さない |
+
+### 7.3 Vercel env 分割（LINE 系キー）
+
+§8.2 の `GITHUB_REPO` と同じ「同名キー × 環境別エントリ」パターン。
+
+1. Vercel Dashboard → feedback-relay-bot → **Settings** → **Environment Variables**
+2. 既存の `LINE_CHANNEL_SECRET` 行 → `⋯` → **Edit** → Environments を **Production だけ** に絞る（**Value は触らない** = 本番チャンネル Secret のまま）
+3. **Add New** → Key: `LINE_CHANNEL_SECRET` / Value: **DEV チャンネルの Channel Secret** / Environments: **Preview + Development** で追加
+4. `LINE_CHANNEL_ACCESS_TOKEN` も同手順（既存を Production に絞る → Add New で DEV 用を Preview + Development に追加）
+5. 結果: 4 エントリ（`LINE_CHANNEL_SECRET` × 2、`LINE_CHANNEL_ACCESS_TOKEN` × 2）が並ぶ。`mcp__vercel__vercel-get-environments` で `target` フィールドが `["production"]` と `["preview","development"]` に分かれていることを確認可能
+
+### 7.4 develop ブランチ運用への移行
+
+1. ローカルで `git checkout -b develop && git push -u origin develop`
+2. **要注意**: develop が main と同じ commit を指すと、Vercel が SHA dedup で **Preview デプロイを作らない**。develop に新しい commit を 1 つ載せて分岐させる必要がある（最初は空 commit でも可: `git commit --allow-empty -m "chore(deploy): trigger initial preview"`）
+3. push 後、Vercel が自動で Preview デプロイ作成（1〜2 分）。固定 URL は命名規則で確定: `https://feedback-relay-bot-git-develop-<team-slug>.vercel.app`
+4. 以降、ひろゆきさんの開発フローは **`develop` で実装 → 本人が DEV チャンネルで触って確認 → develop → main の PR → マージで本番反映** に切り替わる（[WORKFLOW.md](./WORKFLOW.md) 参照）
+
+### 7.5 DEV チャンネル Webhook URL 設定
+
+1. LINE Developers Console → DEV チャンネル → **Messaging API** タブ → **Webhook settings**
+2. **Webhook URL**: `https://feedback-relay-bot-git-develop-<team-slug>.vercel.app/api/line/webhook`（§7.4 で確認した URL）→ **Update**
+3. **Verify** ボタン → `Success.` を確認（§6.5.2 と同じ仕組み）
+4. **Use webhook** トグルを **ON**
+5. 本人の LINE で DEV チャンネルを友達追加（QR は §2.6 と同じ場所、Developers Console / OA Manager のいずれかから）
+
+### 7.6 実機疎通確認
+
+DEV と本番、両方の経路で動くことを確認する（env 分離が効いている保証）。
+
+1. 本人 LINE → **DEV チャンネル**に `DEV テスト送信` などのテキストを送信
+   - sandbox リポ（[feedback-relay-bot-sandbox](https://github.com/hirobirofran/feedback-relay-bot-sandbox/issues)）に **`[TEST]` プレフィックス付き Issue** が立つ
+   - LINE 返信に Issue 番号 + URL が含まれる
+2. 本人 LINE → **本番チャンネル**（既存）に `本番テスト送信` を送信
+   - **同じく sandbox リポに `[TEST]` Issue** が立つ（§8 の Production 切替前は本番経路も sandbox に向く設計のため正常動作）
+3. 動作確認 Issue は即 close（**Close as not planned**）
+
+**期待結果**: DEV/本番どちらの経路も「署名検証 → Issue 起票 → 返信」が独立して通る。片方だけ動かない場合は env 分離が崩れている可能性があるので §7.3 のスコープ設定をやり直す。
 
 ## 8. 家族公開前の Production 切替
 
 Phase 1 A 案完了直後は Production / Preview / Development 全環境が **sandbox リポ (`feedback-relay-bot-sandbox`) + `[TEST]` タイトル付与** で動いている。家族に LINE 公式アカウントの友達追加 URL を渡す前に、Production スコープだけを本丸リポに切り替える。
 
+> **前提**: §7 のチャンネル二重化（DEV チャンネル + develop ブランチ運用）が完了していること。§7 が無いまま §8 を実行すると「main に push した瞬間に家族の Bot に反映 + 本丸リポに起票」の二重リスクを背負うことになる。
+>
 > **Claude Code への指示:** このセクションは「家族公開」という判断が発生する瞬間にオーナー（ひろゆきさん）と一緒に実行する前提で書かれている。切替後は本丸リポ `hirobirofran/food-inventory-app` に実 Issue が立つので、誤実行のリスクが最も高い。必ず §8.5 の実機疎通まで終えてから家族に URL を渡す。
 
 ### 8.1 方針
@@ -508,7 +573,7 @@ Phase 1 A 案完了直後は Production / Preview / Development 全環境が **s
     - Preview / Development: `test`
 5. **`ALLOWED_LINE_USER_IDS` は全環境共通**（§6.5.3 で投入済み）のままで良い。家族分を追加する場合はここで**カンマ区切りで追記**（例: `U<本人>,U<家族1>,U<家族2>`）
 
-**秘密値は触らない**: `LINE_CHANNEL_SECRET` / `LINE_CHANNEL_ACCESS_TOKEN` / `GITHUB_TOKEN` / `GEMINI_API_KEY` / Upstash 資格情報は本セクションで変更する必要がない。
+**秘密値は触らない**: `GITHUB_TOKEN` / `GEMINI_API_KEY` / Upstash 資格情報は本セクションで変更する必要がない。`LINE_CHANNEL_SECRET` / `LINE_CHANNEL_ACCESS_TOKEN` も本セクションでは触らない（§7.3 で既に Production = 本番チャンネル / Preview+Development = DEV チャンネルに環境別エントリで分割済みのため、本切替で値の差し替えは不要）。
 
 ### 8.3 Vercel MCP 補足（Claude 伴走時）
 
