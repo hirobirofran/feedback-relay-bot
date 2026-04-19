@@ -4,6 +4,27 @@
 
 ---
 
+## 2026-04-19（Phase 1 A 案 E2E 到達セッション）
+
+### 技術的な気づき（Phase 1 A）
+
+- `@google/generative-ai` v0.24 では `generationConfig.responseMimeType: "application/json"` + `responseSchema` を指定すると、Gemini が ` ```json ``` ` 囲みなしの純 JSON 文字列を返す。Phase 0 で想定していた「正規表現で ` ```json ``` ` を剥がす」前処理は不要になった。`SchemaType.OBJECT` の `required` フィールドは `string[]`（mutable）なので `as const` で固めると型エラー。`ResponseSchema` 型注釈だけ付けて通常の配列リテラルで書くのが TypeScript strict と相性が良い
+- Octokit `@octokit/rest` の `issues.create` は `{ owner, repo, title, body }` の最小引数で動く。`labels` を省略すれば本当にラベルなしで立つ。ラベル未整備の sandbox リポでも失敗しない
+- `@line/bot-sdk` v11 では `messagingApi.MessagingApiClient` のコンストラクタ引数が `{ channelAccessToken: string }` 形式。古いドキュメントの `new Client({ channelAccessToken })` ではなく `new messagingApi.MessagingApiClient({ channelAccessToken })`。LINE Reply は `replyMessage({ replyToken, messages: [{ type: "text", text }] })` で送れる
+- Webhook ハンドラ内で Gemini + GitHub を同期的に直列実行しても Vercel Hobby の 10 秒タイムアウト内に収まった（Gemini 2.5 Flash で 2-3 秒、GitHub 起票 1 秒未満）。replyToken 2 段階化（考え中 → push）は現時点では不要。将来 Gemini が重くなったら再考
+
+### 運用・設計の気づき（Phase 1 A）
+
+- **テスト環境の二重化**: 本丸リポ（food-inventory-app）を汚さないために (a) sandbox リポを用意して env で切替 (b) `FEEDBACK_BOT_MODE=test` でタイトル冒頭に `[TEST]` 付与、の 2 段構えを採用。どちらか片方だけだと「env の書き換えを忘れて本番リポに飛ぶ」or「sandbox のつもりが本物リポに行ったことを title からは判別できない」というリスクが残る。**Phase 1 AND イニシャルリリース後も** sandbox は残して Preview 環境（or 本人テスト用途）のままにする
+- Fine-grained PAT の Repository access は後から追加できる（トークン再発行不要）。`hirobirofran/food-inventory-app` + `hirobirofran/feedback-relay-bot-sandbox` の 2 個 Selected repositories に列挙する形で、PAT 1 本で両方に起票できる
+- Issue に **draft 状態は存在しない**（draft は PR だけの概念）。テストと本番の区別は title prefix or label or 別リポで行うしかない。本プロジェクトでは「別リポ + title prefix」の二重化で決着
+
+### 次回セッションへの申し送り（Phase 1 A）
+
+- Phase 2 / B 案（Redis 会話状態機械）に着手する場合は、A 案の単発版を**残したまま** state=none のフォールバックとして呼べるように設計すると実装が楽。既存の `buildIssueFromFeedback(text)` は単一ターン用途そのまま流用可能
+- 家族公開直前の切替手順は [docs/SETUP.md](./SETUP.md) §8 として近いうちに書き下す（Production env の `GITHUB_REPO` と `FEEDBACK_BOT_MODE` を差し替える 2 ステップ + 動作確認 1 ステップ）
+- 家族レビューに出す前に Bot の返信文「起票しました。\n（タイトル）\n（URL）」を家族（CS プロ）目線で再チェックしたい。Phase 2 の会話設計見直しと一緒に
+
 ## 2026-04-19（Phase 1 着手セッション）
 
 ### 技術的な気づき

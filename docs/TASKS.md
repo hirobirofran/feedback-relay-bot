@@ -33,15 +33,15 @@ Phase 0 完了。次は Phase 1 実装（[DESIGN.md §10](./DESIGN.md) の Phase
 - [x] env ヘルパー作成（2026-04-19、[src/lib/env.ts](../src/lib/env.ts)）
 - [x] Vercel 本番デプロイ + LINE Webhook URL 設定 + Verify 成功（2026-04-19、本番 `https://feedback-relay-bot.vercel.app/api/line/webhook`）
 - [x] 初回 userId 回収 + `ALLOWED_LINE_USER_IDS` 投入 + 再デプロイ（2026-04-19、実機メッセージで `received authorized event` ログ確認済み。手順は [SETUP.md §6.5.3](./SETUP.md#653-初回-userid-の回収と投入ここが-phase-1-特有)）
+- [x] **A 案（単発版）実装 + sandbox リポへの E2E 疎通**（2026-04-19、`feedback-relay-bot-sandbox` private リポ作成、PAT access 追加、Vercel env に `GITHUB_REPO=feedback-relay-bot-sandbox` + `FEEDBACK_BOT_MODE=test` 投入、LINE 実機メッセージで sandbox #1 起票成功、タイトルに `[TEST]` プレフィックス付与確認、Gemini の `## 背景 / ## 期待する動作 / ## 補足 / ## 元メッセージ` セクション構造通り）
 
-### 🔲 次にやること（Phase 1）
+### 🔲 次にやること（Phase 2 着手前）
 
-LINE → Vercel の配管は通った。残りは会話ロジック:
+Phase 1 DoD 最短コース到達。以下は Phase 2 移行前の選択肢:
 
-- A: Gemini + GitHub 起票の単発版（会話状態なし、1 メッセージ → Issue 直起票、Phase 1 DoD 最短コース）
-- B: Redis 会話状態 + `gathering`→`confirming`→`done` 状態機械
-
-A / B どちらから着手するかは別セッション冒頭で見積もり提示して判断する。
+- **B: Redis 会話状態 + 状態機械**（`gathering`→`confirming`→`done`、起票前に「これで起票しますか？」の確認ステップ）
+- **家族公開前チェックリスト運用**: Production env だけ `GITHUB_REPO=food-inventory-app` + `FEEDBACK_BOT_MODE=production` に切替、Preview は sandbox のまま残してデグレ検知用に維持（手順は [SETUP.md](./SETUP.md) §8 予定）
+- **ラベル運用**: sandbox / 本丸どちらも `from-family` ラベル整備、Gemini 出力の labels を採用する経路追加
 
 ## Phase 2: 家族展開（未着手）
 
