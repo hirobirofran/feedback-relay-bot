@@ -23,3 +23,29 @@ export function getAllowedLineUserIds(): Set<string> {
       .filter((id) => id.length > 0),
   );
 }
+
+export function getGeminiApiKey(): string {
+  return required("GEMINI_API_KEY");
+}
+
+export function getGeminiModel(): string {
+  return process.env.GEMINI_MODEL ?? "gemini-2.5-flash";
+}
+
+export function getGithubToken(): string {
+  return required("GITHUB_TOKEN");
+}
+
+export function getGithubOwner(): string {
+  return required("GITHUB_OWNER");
+}
+
+export function getGithubRepo(): string {
+  return required("GITHUB_REPO");
+}
+
+export type FeedbackBotMode = "test" | "production";
+
+export function getFeedbackBotMode(): FeedbackBotMode {
+  return process.env.FEEDBACK_BOT_MODE === "production" ? "production" : "test";
+}
