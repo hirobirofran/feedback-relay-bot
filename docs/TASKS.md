@@ -44,6 +44,7 @@ Phase 1 DoD 最短コース到達 + 家族公開前の軽い整備まで完了�
 - **B: Redis 会話状態 + 状態機械**（`gathering`→`confirming`→`done`、起票前に「これで起票しますか？」の確認ステップ）
 - **ラベル運用**: sandbox / 本丸どちらも `from-family` ラベル整備、Gemini 出力の labels を採用する経路追加
 - **LINE follow event の初回あいさつ実装**（CLAUDE.md §会話設計の初手ルール 1 の未着手分。B 案の会話状態機械と合わせて再検討）
+- **🔴 LINE チャンネル二重化（家族公開前に必須）**: 現状 LINE チャンネル 1 つで Webhook は Production 固定。家族公開後は main push が即家族の Bot に反映される設計になっており、壊れた dev 版が家族に見えるリスク大。テスト用 LINE チャンネル（`食材アプリ 意見箱 DEV` 相当）を追加し、Preview デプロイの固定 URL（develop ブランチ運用 or Vercel Preview alias）に Webhook を向ける。env は `LINE_CHANNEL_SECRET` / `LINE_CHANNEL_ACCESS_TOKEN` を Production と Preview/Development で別値に分割。**家族への友達追加 URL を渡す前に完了必須**
 
 ## Phase 2: 家族展開（未着手）
 
