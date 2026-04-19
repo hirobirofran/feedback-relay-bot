@@ -359,3 +359,85 @@ Claude は `mcp__claude_ai_Google_Calendar__create_event` を以下パラメー�
 | description | 更新手順リンク + Claude Code への依頼例 |
 
 ## 6. Vercel デプロイ
+
+Next.js アプリと API Route を Vercel の Hobby プラン（無料）で本番ホストする。食材管理アプリと同じアカウント・同じ方針（ダッシュボード UI から直接入力 / CLI は使わない）。
+
+> **Claude Code への指示:** プロジェクト作成と env 投入は Vercel Web UI 専用。Claude Code からできるのは `.env.local` の値読み取り（チャットに出さずユーザーに見せる形）と、デプロイ後の URL 疎通確認。
+
+### Vercel 方針サマリ
+
+- **インポート方法**: **Dashboard → Import Git Repository**（CLI `vercel project add` は GitHub 連携が付かず不安定。食材管理アプリの KNOWLEDGE.md 参照）
+- **Framework**: Next.js（自動検出）
+- **環境変数投入**: Dashboard UI から**直接入力**（CLI stdin 経由はシェル履歴に残るため使わない）
+- **Deployment Protection**: **Disabled**（LINE の Webhook が無認証で叩ける必要があるため。署名検証は Bot 側コードで行う）
+
+### 6.1 プロジェクト作成
+
+1. <https://vercel.com/> にログイン（既存アカウントで OK、food-inventory-app と同じもの）
+2. **Add New...** → **Project**
+3. **Import Git Repository** セクションで `hirobirofran/feedback-relay-bot` を選んで **Import**
+4. 設定画面で以下を確認（ほぼ自動検出されている）:
+
+    | 項目 | 値 |
+    | --- | --- |
+    | Project Name | `feedback-relay-bot`（自動） |
+    | Framework Preset | Next.js |
+    | Root Directory | `./`（デフォルト） |
+    | Build Command | `next build`（自動） |
+
+5. **Environment Variables** セクションを展開 → §6.2 の手順で全件入力
+6. 全件入力後 **Deploy** をクリック → 初回ビルド開始（1〜2 分）
+
+### 6.2 環境変数の投入
+
+`.env.local` の値を Vercel Dashboard に写す。全 9 件（Phase 0 時点）。**Production / Preview / Development すべてにチェック**を入れて 1 回で済ませる（個別管理は後で必要になったら分ける）。
+
+| Key | Value | 出どころ |
+| --- | --- | --- |
+| `LINE_CHANNEL_SECRET` | `.env.local` の値 | §2.4 で取得 |
+| `LINE_CHANNEL_ACCESS_TOKEN` | `.env.local` の値 | §2.4 で取得 |
+| `GEMINI_API_KEY` | `.env.local` の値 | §4 で取得 |
+| `GEMINI_MODEL` | `gemini-2.5-flash` | 固定値 |
+| `GITHUB_TOKEN` | `.env.local` の値 | §5.1 で取得 |
+| `GITHUB_OWNER` | `hirobirofran` | 固定値 |
+| `GITHUB_REPO` | `food-inventory-app` | 固定値 |
+| `UPSTASH_REDIS_REST_URL` | `.env.local` の値 | §3.1 で取得 |
+| `UPSTASH_REDIS_REST_TOKEN` | `.env.local` の値 | §3.1 で取得 |
+
+> **秘密情報は貼らない**: Vercel UI には `.env.local` から 1 件ずつコピペで入れる。Claude Code のチャットに値を貼らないこと（メンテ支援を頼むときは「投入済み」「投入漏れ」だけ伝える）。
+>
+> **食材管理アプリ KNOWLEDGE.md の教訓**: PowerShell のパイプ経由で `vercel env` を叩くと値が空になったり末尾改行が付いたりする既知問題がある。UI から直接入力すれば起きない。
+
+`ALLOWED_LINE_USER_IDS` / `USER_DISPLAY_NAME_MAP` は Phase 1 で Webhook が最初の userId を拾ったら入れる。Phase 0 では**未設定でよい**。
+
+### 6.3 Deployment Protection を Disabled に
+
+デフォルトだと Vercel Authentication が ON で、LINE からの Webhook リクエストが 401 で弾かれる。Phase 0 の hello-world 状態では外界からアクセスさせる必要はないが、Phase 1 で Webhook を繋ぐ前に必ず Disabled にする（今のうちにやっておくほうが忘れないので推奨）。
+
+1. プロジェクトダッシュボード → **Settings** → **Deployment Protection**
+2. **Vercel Authentication** セクションで **Standard Protection** → **Disabled** に変更
+3. **Save** を必ず押す（食材管理アプリ KNOWLEDGE.md の実体験より、Save 忘れが頻発する）
+
+### 6.4 疎通確認
+
+初回デプロイが Ready になったら:
+
+1. プロジェクトの **Domains** 欄から URL を確認（例: `https://feedback-relay-bot.vercel.app/` や `https://feedback-relay-bot-xxxxx.vercel.app/`）
+2. ブラウザ or curl でアクセス:
+
+    ```bash
+    curl -sI https://feedback-relay-bot.vercel.app/ | head -5
+    ```
+
+    期待: `HTTP/2 200` が返る。401 なら Deployment Protection が残っている。404 なら Domains 欄の URL を再確認
+
+3. [docs/TASKS.md](./TASKS.md) の Phase 0 完了リストに「Vercel プロジェクト作成 + 初回デプロイ成功」「本番 URL: （確定した URL）」を記録
+
+### 6.5 Phase 1 で追加する作業
+
+Phase 1 実装後に以下を行う:
+
+- `src/app/api/webhook/line/route.ts` を実装 → push → Vercel 自動デプロイ
+- LINE Developers Console の **Webhook URL** に `https://<本番URL>/api/webhook/line` を入力 → **Use webhook** を ON
+- LINE Official Account Manager の **Webhook** トグルを ON
+- LINE から初回メッセージを送信 → Vercel Logs で userId を確認 → `.env.local` と Vercel env の `ALLOWED_LINE_USER_IDS` に記入 → 再デプロイ
